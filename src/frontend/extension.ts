@@ -12,8 +12,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 	//=========================================================================================
 	const kernelInOutBreakpointArgs = 1;
-	const userDebugFile = "initproc"; //可以修改为其它用户程序名，如matrix
-	const your_path_to_core = os.homedir() + "/rCore-Tutorial-v3";
+	const userDebugFile = "ch9b_initproc"; //可以修改为其它用户程序名，如matrix
+	const your_path_to_core = os.homedir() + "/rCore-Tutorial-Code-2023S";
 	//========================================================================================
 
 	const removeDebugFileCmd = vscode.commands.registerCommand("code-debug.removeDebugFile", () => {

@@ -340,7 +340,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 			this.sendEvent({ event: "inKernel" } as DebugProtocol.Event);
 			if (
 				info.outOfBandRecord[0].output[3][1][3][1] === "src/trap/mod.rs" &&
-				info.outOfBandRecord[0].output[3][1][5][1] === "135"
+				info.outOfBandRecord[0].output[3][1][5][1] === "148"
 			) {
 				this.sendEvent({ event: "kernelToUserBorder" } as DebugProtocol.Event);
 			}
@@ -1252,7 +1252,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
 						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
-						breakpoints: [{ line: 65 }] as DebugProtocol.SourceBreakpoint[],
+						breakpoints: [{ line: 79 }] as DebugProtocol.SourceBreakpoint[],
 					} as DebugProtocol.SetBreakpointsArguments
 				);
 				break;
@@ -1261,7 +1261,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
 						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
-						breakpoints: [{ line: 135 }] as DebugProtocol.SourceBreakpoint[],
+						breakpoints: [{ line: 148 }] as DebugProtocol.SourceBreakpoint[],
 					} as DebugProtocol.SetBreakpointsArguments
 				);
 				break;
@@ -1278,7 +1278,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
 						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
-						breakpoints: [{ line: 30 }] as DebugProtocol.SourceBreakpoint[],
+						breakpoints: [{ line: 43 }] as DebugProtocol.SourceBreakpoint[],
 					} as DebugProtocol.SetBreakpointsArguments
 				);
 				//this.sendEvent({ event: "eventTest"} as DebugProtocol.Event);
