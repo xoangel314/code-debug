@@ -682,7 +682,7 @@ export PATH=$PATH:/home/path/to/riscv64-linux-musl-cross/bin
                "request": "launch",
                "name": "Attach to Qemu",
                "executable": "${userHome}/rCore-Tutorial-v3/os/target/riscv64gc-unknown-none-elf/release/os",
-               "target": ":1234",
+               "target": ":1234",//不能和Qemu开放的tcp端口重叠
                "remote": true,
                "cwd": "${workspaceRoot}",
                "valuesFormatting": "parseText",
