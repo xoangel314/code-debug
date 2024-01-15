@@ -226,6 +226,10 @@ export class MI2DebugSession extends DebugSession {
 	public KERNEL_IN_BREAKPOINTS_LINE;//TODO THIS SHOULD HAVE BEEN IN gdb.ts. However Codes that uses those stuff are all in mibase.ts. :(
 	public KERNEL_OUT_BREAKPOINTS_LINE;
 	public GO_TO_KERNEL_LINE;
+	public KERNEL_IN_BREAKPOINTS_FILENAME;//those names are really confusing :(
+	public KERNEL_OUT_BREAKPOINTS_FILENAME;
+	public GO_TO_KERNEL_FILENAME;
+
 
 
 	public constructor(debuggerLinesStartAt1: boolean, isServer: boolean = false) {
@@ -344,7 +348,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 			this.addressSpaces.updateCurrentSpace("kernel");
 			this.sendEvent({ event: "inKernel" } as DebugProtocol.Event);
 			if (
-				info.outOfBandRecord[0].output[3][1][3][1] === "src/trap/mod.rs" &&
+				info.outOfBandRecord[0].output[3][1][3][1] === this.KERNEL_OUT_BREAKPOINTS_FILENAME &&
 				info.outOfBandRecord[0].output[3][1][5][1] === this.KERNEL_OUT_BREAKPOINTS_LINE+""
 			) {
 				this.sendEvent({ event: "kernelToUserBorder" } as DebugProtocol.Event);
@@ -524,7 +528,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 				const spaceName = this.addressSpaces.pathToSpaceName(path);
 				//保存断点信息，如果这个断点不是当前空间的（比如还在内核态时就设置用户态的断点），暂时不通知GDB设置断点
 				//如果这个断点是当前地址空间，或者是内核入口断点，那么就通知GDB立即设置断点
-				if ((spaceName === this.addressSpaces.getCurrentSpaceName()) || (path === "src/trap/mod.rs" && args.breakpoints[0].line === this.GO_TO_KERNEL_LINE)
+				if ((spaceName === this.addressSpaces.getCurrentSpaceName()) || (path === this.GO_TO_KERNEL_FILENAME && args.breakpoints[0].line === this.GO_TO_KERNEL_LINE)
 				) {
 					// TODO rules can be set by user
 					this.addressSpaces.saveBreakpointsToSpace(args, spaceName);				}
@@ -1280,8 +1284,8 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 				this.setBreakPointsRequest(
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
-						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
-						breakpoints: [{ line: this.KERNEL_IN_BREAKPOINTS_LINE }] as DebugProtocol.SourceBreakpoint[],
+						source: { path: this.KERNEL_IN_BREAKPOINTS_FILENAME } as DebugProtocol.Source,
+						breakpoints: [{ line: this.KERNEL_IN_BREAKPOINTS_LINE }] as DebugProtocol.SourceBreakpoint[], //TODO change this to GO_TO_KERNEL?
 					} as DebugProtocol.SetBreakpointsArguments
 				);
 				break;
@@ -1289,7 +1293,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 				this.setBreakPointsRequest(
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
-						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
+						source: { path: this.KERNEL_OUT_BREAKPOINTS_FILENAME } as DebugProtocol.Source,
 						breakpoints: [{ line: this.KERNEL_OUT_BREAKPOINTS_LINE }] as DebugProtocol.SourceBreakpoint[],
 					} as DebugProtocol.SetBreakpointsArguments
 				);
@@ -1306,7 +1310,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 				this.setBreakPointsRequest(
 					response as DebugProtocol.SetBreakpointsResponse,
 					{
-						source: { path: "src/trap/mod.rs" } as DebugProtocol.Source,
+						source: { path: this.GO_TO_KERNEL_FILENAME } as DebugProtocol.Source,
 						breakpoints: [{ line: this.GO_TO_KERNEL_LINE }] as DebugProtocol.SourceBreakpoint[],
 					} as DebugProtocol.SetBreakpointsArguments
 				);

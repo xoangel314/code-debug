@@ -148,6 +148,8 @@ Qemu虚拟机运行rCore-Tutorial操作系统，本项目中Qemu开启了gdbstub
 
 ## 调试工具实现
 
+TODO: 这一节所列出的代码有**少量**变动，应当更新
+
 ### 常用API、GDB命令
 
 #### TreeView命令注册
@@ -720,15 +722,18 @@ export PATH=$PATH:/home/path/to/riscv64-linux-musl-cross/bin
                    "-s",
                    "-S"
                ],
-
+            "userSpaceDebuggeeFolder":"${userHome}/rCore-Tutorial-v3/user/target/riscv64gc-unknown-none-elf/release/",
             "KERNEL_IN_BREAKPOINTS_LINE":65, // src/trap/mod.rs中内核入口行号。可能要修改
             "KERNEL_OUT_BREAKPOINTS_LINE":124, // src/trap/mod.rs中内核出口行号。可能要修改
             "GO_TO_KERNEL_LINE":30, // src/trap/mod.rs中，用于从用户态返回内核的断点行号。在rCore-Tutorial-v3中，这是set_user_trap_entry函数中的stvec::write(TRAMPOLINE as usize, TrapMode::Direct);语句。
+            "KERNEL_IN_BREAKPOINTS_FILENAME":"src/trap/mod.rs",
+            "KERNEL_OUT_BREAKPOINTS_FILENAME":"src/trap/mod.rs",
+            "GO_TO_KERNEL_FILENAME":"src/trap/mod.rs"
            },
        ]
    }
    ```
-
+    - 这里解释一下`KERNEL_IN_BREAKPOINTS_LINE`和`GO_TO_KERNEL_LINE`的区别。以rCore-Tutorial-v3为例，`KERNEL_IN_BREAKPOINTS_LINE`对应`trap_return`函数的断点，而`GO_TO_KERNEL_LINE`对应`trap_return`函数调用的`set_user_trap_entry`子函数的断点。而`set_user_trap_entry`子函数实际上只有一行语句：`stvec::write(TRAMPOLINE as usize, TrapMode::Direct);`。也就是说，`KERNEL_IN_BREAKPOINTS_LINE`指向中断处理例程，而`GO_TO_KERNEL_LINE`精确地指向中断处理例程中的`stvec::write(TRAMPOLINE as usize, TrapMode::Direct);`语句。
 1. 为了用eBPF Panel，需要在rCore-Tutorial-v3的根目录下添加一个脚本：
 
 ```shell

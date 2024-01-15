@@ -34,10 +34,15 @@ export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArgum
 	showDevDebugOutput: boolean;
 	qemuPath: string;
 	qemuArgs: string[];
-	userSpaceDebuggeeFiles: string[];
+	userSpaceDebuggeeFolder: string;
 	KERNEL_IN_BREAKPOINTS_LINE:number;
 	KERNEL_OUT_BREAKPOINTS_LINE:number;
 	GO_TO_KERNEL_LINE:number;
+	KERNEL_IN_BREAKPOINTS_FILENAME:string;
+	KERNEL_OUT_BREAKPOINTS_FILENAME:string;
+	GO_TO_KERNEL_FILENAME:string;
+	
+	//更新新参数，然后更新文档
 }
 
 let NEXT_TERM_ID = 1;
@@ -75,6 +80,22 @@ export class GDBDebugSession extends MI2DebugSession {
 		this.KERNEL_IN_BREAKPOINTS_LINE=args.KERNEL_IN_BREAKPOINTS_LINE;
 		this.KERNEL_OUT_BREAKPOINTS_LINE=args.KERNEL_OUT_BREAKPOINTS_LINE;
 		this.GO_TO_KERNEL_LINE=args.GO_TO_KERNEL_LINE;
+		this.KERNEL_IN_BREAKPOINTS_FILENAME=args.KERNEL_IN_BREAKPOINTS_FILENAME;
+		this.KERNEL_OUT_BREAKPOINTS_FILENAME=args.KERNEL_OUT_BREAKPOINTS_FILENAME;
+		this.GO_TO_KERNEL_FILENAME=args.GO_TO_KERNEL_FILENAME;
+
+		this.sendEvent({ event: "userConfInfo", body:{
+			KERNEL_IN_BREAKPOINTS_LINE:args.KERNEL_IN_BREAKPOINTS_LINE, // src/trap/mod.rs中内核入口行号。可能要修改
+            KERNEL_OUT_BREAKPOINTS_LINE:args.KERNEL_OUT_BREAKPOINTS_LINE, // src/trap/mod.rs中内核出口行号。可能要修改
+            GO_TO_KERNEL_LINE:args.GO_TO_KERNEL_LINE, // src/trap/mod.rs中，用于从用户态返回内核的断点行号。在rCore-Tutorial-v3中，这是set_user_trap_entry函数中的stvec::write(TRAMPOLINE as usize, TrapMode::Direct);语句。
+            KERNEL_IN_BREAKPOINTS_FILENAME:args.KERNEL_IN_BREAKPOINTS_FILENAME,
+            KERNEL_OUT_BREAKPOINTS_FILENAME:args.KERNEL_OUT_BREAKPOINTS_FILENAME,
+            GO_TO_KERNEL_FILENAME:args.GO_TO_KERNEL_FILENAME,
+			executable:args.executable,
+			userSpaceDebuggeeFolder:args.userSpaceDebuggeeFolder
+
+
+		}   } as DebugProtocol.Event);
 		
 		this.runInTerminalRequest(
 			{

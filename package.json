@@ -300,12 +300,11 @@
 									"-S"
 								]
 							},
-							"userSpaceDebuggeeFiles": {
-								"type": "array",
-								"description": "userspace executable name which will be debugged",
-								"default": [
-									"initproc"
-								]
+							"userSpaceDebuggeeFolder": {
+								"type": "string",
+								"description": "userspace executable folder which executables inside will be debugged",
+								"default": 
+									"please_configure_userSpaceDebuggeeFolder"
 							}
 						}
 					}

@@ -2,6 +2,20 @@ import * as vscode from "vscode";
 import * as os from "os";
 import * as ChildProcess from "child_process";
 
+//=========================================================================================
+let userDebugFile = "initproc"; //可以修改为其它用户程序名，如matrix
+let userConf = {// Default values are suitable for rCore-Tutorial-v3 since it is most commonly used
+	KERNEL_IN_BREAKPOINTS_LINE:65, 
+	KERNEL_OUT_BREAKPOINTS_LINE:124, 
+	GO_TO_KERNEL_LINE:30, 
+	KERNEL_IN_BREAKPOINTS_FILENAME:"src/trap/mod.rs",
+	KERNEL_OUT_BREAKPOINTS_FILENAME:"src/trap/mod.rs",
+	GO_TO_KERNEL_FILENAME:"src/trap/mod.rs",
+	executable:"",//executable with symbol. absolute path
+	userSpaceDebuggeeFolder:""//absolute path
+}
+//========================================================================================
+
 export function activate(context: vscode.ExtensionContext) {
 
 	// Only allow a single Panel
@@ -113,7 +127,7 @@ export function activate(context: vscode.ExtensionContext) {
 					ChildProcess.exec('nm '+vscode.workspace.workspaceFolders[0].uri.path+'/os/target/riscv64gc-unknown-none-elf/release/'+'os'+' | rustfilt |grep '+selectedText, 
 					(err, stdout, stderr) => {
 						console.log('stdout: ' + stdout);
-						panel.webview.postMessage({ command: 'symbol_table_update',text:stdout.split('\n'),program_name:'kernel'});
+						panel.webview.postMessage({ command: 'symbol_table_update',text:stdout.split('\n'),program_name:"kernel"});
 						//console.log('stdout: ' + stdout);
 						if(stderr){
 							console.log('stderr in registering selected symbol: ' + stderr)
@@ -137,17 +151,13 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("code-debug.examineMemoryLocation", examineMemory)
 	);
 
-	//=========================================================================================
-	const kernelInOutBreakpointArgs = 1;
-	let userDebugFile = "initproc"; //可以修改为其它用户程序名，如matrix
-	const your_path_to_core = os.homedir() + "/rCore-Tutorial-v3-eBPF/rCore-Tutorial-v3"; //tag:oscomp2023 org:/rCore-Tutorial-v3
-	//========================================================================================
+
 
 	const removeDebugFileCmd = vscode.commands.registerCommand("code-debug.removeDebugFile", () => {
 		// 自定义请求.customRequest函数见/src/mibase.ts
 		vscode.debug.activeDebugSession?.customRequest("removeDebugFile", {
 			debugFilepath:
-			your_path_to_core + "/user/target/riscv64gc-unknown-none-elf/release/"+userDebugFile,
+			userConf.userSpaceDebuggeeFolder+userDebugFile,
 		});
 		// 弹出窗口
 		vscode.window.showInformationMessage("symbol file "+userDebugFile+" removed");
@@ -244,7 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
 							vscode.window.showInformationMessage("will switched to " + userDebugFile + " breakpoints");
 							vscode.debug.activeDebugSession?.customRequest("addDebugFile", {
 								debugFilepath:
-									your_path_to_core + "/user/target/riscv64gc-unknown-none-elf/release/" +userDebugFile,
+									userConf.userSpaceDebuggeeFolder +userDebugFile,
 									//tag:oscomp2023 original "/user/target/riscv64gc-unknown-none-elf/release/" +userDebugFile,
 			
 							});
@@ -266,12 +276,11 @@ export function activate(context: vscode.ExtensionContext) {
 							//vscode.window.showInformationMessage("switched to trap_handle");
 							vscode.debug.activeDebugSession?.customRequest("addDebugFile", {
 								debugFilepath:
-									your_path_to_core +
-									"/os/target/riscv64gc-unknown-none-elf/release/os",
+									userConf.executable,
 							});
 							vscode.debug.activeDebugSession?.customRequest(
 								"updateCurrentSpace",
-								"src/trap/mod.rs"
+								"kernel"//TODO this value used to be src/trap/mod.rs which means border breakpoints belongs to a unique space. now we changed it to 'kernel'
 							);
 							vscode.window.showInformationMessage("go to kernel trap_handle");
 						}
@@ -333,6 +342,9 @@ export function activate(context: vscode.ExtensionContext) {
 								userDebugFile= newProcessName.match(quotation_regex)[0].toString().slice(1, -1);
 								vscode.window.showInformationMessage("new process "+userDebugFile+" updated");
 							}
+							
+						}
+						else if (message.event === "c"){
 							
 						}
 					}
