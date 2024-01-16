@@ -215,6 +215,7 @@ export class MI2DebugSession extends DebugSession {
 	protected attached: boolean;
 	protected initialRunCommand: RunCommand;
 	protected stopAtEntry: boolean | string;
+	protected isSSH: boolean;
 	public sourceFileMap: SourceFileMap;
 	protected started: boolean;
 	protected crashed: boolean;
@@ -486,46 +487,41 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		}
 	}
 
-	protected setFunctionBreakPointsRequest(
-		response: DebugProtocol.SetFunctionBreakpointsResponse,
-		args: DebugProtocol.SetFunctionBreakpointsArguments
-	): void {
+	protected setFunctionBreakPointsRequest(response: DebugProtocol.SetFunctionBreakpointsResponse, args: DebugProtocol.SetFunctionBreakpointsArguments): void {
 		const all = [];
-		args.breakpoints.forEach((brk) => {
-			all.push(
-				this.miDebugger.addBreakPoint({
-					raw: brk.name,
-					condition: brk.condition,
-					countCondition: brk.hitCondition,
-				})
-			);
+		args.breakpoints.forEach(brk => {
+			all.push(this.miDebugger.addBreakPoint({ raw: brk.name, condition: brk.condition, countCondition: brk.hitCondition }));
 		});
-		Promise.all(all).then(
-			(brkpoints) => {
-				const finalBrks = [];
-				brkpoints.forEach((brkp) => {
-					if (brkp[0]) finalBrks.push({ line: brkp[1].line });
-				});
-				response.body = {
-					breakpoints: finalBrks,
-				};
-				this.sendResponse(response);
-			},
-			(msg) => {
-				this.sendErrorResponse(response, 10, msg.toString());
-			}
-		);
+		Promise.all(all).then(brkpoints => {
+			const finalBrks = [];
+			brkpoints.forEach(brkp => {
+				if (brkp[0])
+					finalBrks.push({ line: brkp[1].line });
+			});
+			response.body = {
+				breakpoints: finalBrks
+			};
+			this.sendResponse(response);
+		}, msg => {
+			this.sendErrorResponse(response, 10, msg.toString());
+		});
 	}
+
+
 	//设置某一个文件的所有断点
 	protected setBreakPointsRequest(
 		response: DebugProtocol.SetBreakpointsResponse,
 		args: DebugProtocol.SetBreakpointsArguments
 	): void {
+		let path = args.source.path;
+		if (this.isSSH) {
+			// convert local path to ssh path
+			path = this.sourceFileMap.toRemotePath(path);
+		}
 		this.miDebugger.clearBreakPoints(args.source.path).then(
 			() => {
-				//清空该文件的断点
-				const path = args.source.path;
 				const spaceName = this.addressSpaces.pathToSpaceName(path);
+				//清空该文件的断点
 				//保存断点信息，如果这个断点不是当前空间的（比如还在内核态时就设置用户态的断点），暂时不通知GDB设置断点
 				//如果这个断点是当前地址空间，或者是内核入口断点，那么就通知GDB立即设置断点
 				if ((spaceName === this.addressSpaces.getCurrentSpaceName()) || (path === this.GO_TO_KERNEL_FILENAME && args.breakpoints[0].line === this.GO_TO_KERNEL_LINE)
@@ -1185,7 +1181,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		if (configMap === undefined) {
 			this.sourceFileMap = new SourceFileMap({ [fallbackGDB]: fallbackIDE });
 		} else {
-			this.sourceFileMap = new SourceFileMap(configMap);
+			this.sourceFileMap = new SourceFileMap(configMap, fallbackGDB);
 		}
 	}
 

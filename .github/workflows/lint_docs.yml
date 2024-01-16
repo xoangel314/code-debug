@@ -19,7 +19,13 @@ jobs:
         node-version: 16.x
 
     - name: Install Module Dependencies
-      run: npm clean-install --no-optional
+      run: npm clean-install --omit=optional
 
     - name: Stylecheck Project Documentation
       run: npm run prettier-check-docs
+
+    - name: Lint Project Documentation
+      run: npm run lint-docs
+
+    - name: Lint Documentation Links
+      run: npm run link-check

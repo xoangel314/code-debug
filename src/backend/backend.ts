@@ -33,15 +33,32 @@ export interface Variable {
 	raw?: any;
 }
 
+export interface SSHArguments {
+	forwardX11: boolean;
+	host: string;
+	keyfile: string;
+	password: string;
+	useAgent: boolean;
+	cwd: string;
+	port: number;
+	user: string;
+	remotex11screen: number;
+	x11port: number;
+	x11host: string;
+	bootstrap: string;
+	sourceFileMap: { [index: string]: string };
+}
+
 export interface Register {
 	name: string;
 	valueStr: string;
 }
 
 export interface IBackend {
-	load(cwd: string, target: string, procArgs: string, separateConsole: string): Thenable<any>;
-	attach(cwd: string, executable: string, target: string): Thenable<any>;
-	connect(cwd: string, executable: string, target: string): Thenable<any>;
+	load(cwd: string, target: string, procArgs: string, separateConsole: string, autorun: string[]): Thenable<any>;
+	ssh(args: SSHArguments, cwd: string, target: string, procArgs: string, separateConsole: string, attach: boolean, autorun: string[]): Thenable<any>;
+	attach(cwd: string, executable: string, target: string, autorun: string[]): Thenable<any>;
+	connect(cwd: string, executable: string, target: string, autorun: string[]): Thenable<any>;
 	start(runToStart: boolean): Thenable<boolean>;
 	stop();
 	detach();
