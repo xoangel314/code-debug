@@ -1,17 +1,15 @@
 {
 	"name": "debug",
-	"displayName": "Native Debug",
-	"description": "GDB, LLDB & Mago-MI Debugger support for VSCode",
+	"displayName": "OS Debug",
+	"description": "OS Debugger based on WebFreak001/Native Debug",
 	"keywords": [
 		"gdb",
-		"lldb",
-		"mago-mi",
-		"native",
+		"os",
 		"debug"
 	],
 	"license": "public domain",
-	"version": "0.26.0",
-	"publisher": "webfreak",
+	"version": "1.0.0",
+	"publisher": "chenzhiy2001",
 	"icon": "images/icon.png",
 	"engines": {
 		"vscode": "^1.55.0"
@@ -25,7 +23,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/WebFreak001/code-debug.git"
+		"url": "https://github.com/chenzhiy2001/code-debug.git"
 	},
 	"capabilities": {
 		"untrustedWorkspaces": {
@@ -460,7 +458,7 @@
 	},
 	"__metadata": {
 		"id": "2fd22b8e-b3b8-4e7f-9a28-a5e2d1bdd0d4",
-		"publisherDisplayName": "WebFreak",
+		"publisherDisplayName": "chenzhiy2001",
 		"publisherId": "e054f80a-50f9-4d80-85c8-6ff87eef6c35"
 	}
 }
