@@ -146,7 +146,11 @@ class AddressSpaces {
 		this.spaces[newIndex].setBreakpointsArguments.forEach((args) => {
 			this.debugSession.miDebugger.clearBreakPoints(args.source.path).then(
 				() => {
-					const path = args.source.path;
+					let path = args.source.path;
+					if (this.debugSession.isSSH) {
+						// convert local path to ssh path
+						path = this.debugSession.sourceFileMap.toRemotePath(path);
+					}
 					const all = args.breakpoints.map((brk) => {
 						return this.debugSession.miDebugger.addBreakPoint({
 							file: path,
@@ -215,7 +219,7 @@ export class MI2DebugSession extends DebugSession {
 	protected attached: boolean;
 	protected initialRunCommand: RunCommand;
 	protected stopAtEntry: boolean | string;
-	protected isSSH: boolean;
+	public isSSH: boolean;
 	public sourceFileMap: SourceFileMap;
 	protected started: boolean;
 	protected crashed: boolean;
@@ -600,44 +604,38 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		return [frameId & 0xffff, frameId >> 16];
 	}
 
-	protected stackTraceRequest(
-		response: DebugProtocol.StackTraceResponse,
-		args: DebugProtocol.StackTraceArguments
-	): void {
-		this.miDebugger.getStack(args.startFrame, args.levels, args.threadId).then(
-			(stack) => {
-				const ret: StackFrame[] = [];
-				stack.forEach((element) => {
-					let source = undefined;
-					let path = element.file;
-					if (path) {
-						if (process.platform === "win32") {
-							if (path.startsWith("\\cygdrive\\") || path.startsWith("/cygdrive/")) {
-								path = path[10] + ":" + path.substring(11); // replaces /cygdrive/c/foo/bar.txt with c:/foo/bar.txt
-							}
+	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
+		this.miDebugger.getStack(args.startFrame, args.levels, args.threadId).then(stack => {
+			const ret: StackFrame[] = [];
+			stack.forEach(element => {
+				let source = undefined;
+				let path = element.file;
+				if (path) {
+					if (this.isSSH) {
+						// convert ssh path to local path
+						path = this.sourceFileMap.toLocalPath(path);
+					} else if (process.platform === "win32") {
+						if (path.startsWith("\\cygdrive\\") || path.startsWith("/cygdrive/")) {
+							path = path[10] + ":" + path.substring(11); // replaces /cygdrive/c/foo/bar.txt with c:/foo/bar.txt
 						}
-						source = new Source(element.fileName, path);
 					}
+					source = new Source(element.fileName, path);
+				}
 
-					ret.push(
-						new StackFrame(
-							this.threadAndLevelToFrameId(args.threadId, element.level),
-							element.function + "@" + element.address,
-							source,
-							element.line,
-							0
-						)
-					);
-				});
-				response.body = {
-					stackFrames: ret,
-				};
-				this.sendResponse(response);
-			},
-			(err) => {
-				this.sendErrorResponse(response, 12, `Failed to get Stack Trace: ${err.toString()}`);
-			}
-		);
+				ret.push(new StackFrame(
+					this.threadAndLevelToFrameId(args.threadId, element.level),
+					element.function + "@" + element.address,
+					source,
+					element.line,
+					0));
+			});
+			response.body = {
+				stackFrames: ret
+			};
+			this.sendResponse(response);
+		}, err => {
+			this.sendErrorResponse(response, 12, `Failed to get Stack Trace: ${err.toString()}`);
+		});
 	}
 
 	protected configurationDoneRequest(
@@ -1141,29 +1139,21 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		}
 	}
 
-	protected gotoTargetsRequest(
-		response: DebugProtocol.GotoTargetsResponse,
-		args: DebugProtocol.GotoTargetsArguments
-	): void {
-		const path: string = args.source.path;
-		this.miDebugger.goto(path, args.line).then(
-			(done) => {
-				response.body = {
-					targets: [
-						{
-							id: 1,
-							label: args.source.name,
-							column: args.column,
-							line: args.line,
-						},
-					],
-				};
-				this.sendResponse(response);
-			},
-			(msg) => {
-				this.sendErrorResponse(response, 16, `Could not jump: ${msg}`);
-			}
-		);
+	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments): void {
+		const path: string = this.isSSH ? this.sourceFileMap.toRemotePath(args.source.path) : args.source.path;
+		this.miDebugger.goto(path, args.line).then(done => {
+			response.body = {
+				targets: [{
+					id: 1,
+					label: args.source.name,
+					column: args.column,
+					line : args.line
+				}]
+			};
+			this.sendResponse(response);
+		}, msg => {
+			this.sendErrorResponse(response, 16, `Could not jump: ${msg}`);
+		});
 	}
 
 	protected gotoRequest(

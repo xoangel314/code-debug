@@ -66,24 +66,16 @@ export class MI2 extends EventEmitter implements IBackend {
 	}
 
 	load(cwd: string, target: string, procArgs: string, separateConsole: string, autorun: string[]): Thenable<any> {
-		if (!path.isAbsolute(target)) target = path.join(cwd, target);
+		if (!path.isAbsolute(target))
+			target = path.join(cwd, target);
 		return new Promise((resolve, reject) => {
+			this.isSSH = false;
 			const args = this.preargs.concat(this.extraargs || []);
 			this.process = ChildProcess.spawn(this.application, args, { cwd: cwd, env: this.procEnv });
 			this.process.stdout.on("data", this.stdout.bind(this));
 			this.process.stderr.on("data", this.stderr.bind(this));
-			this.process.on(
-				"exit",
-				(() => {
-					this.emit("quit");
-				}).bind(this)
-			);
-			this.process.on(
-				"error",
-				((err) => {
-					this.emit("launcherror", err);
-				}).bind(this)
-			);
+			this.process.on("exit", (() => { this.emit("quit"); }).bind(this));
+			this.process.on("error", ((err) => { this.emit("launcherror", err); }).bind(this));
 			const promises = this.initCommands(target, cwd);
 			if (procArgs && procArgs.length)
 				promises.push(this.sendCommand("exec-arguments " + procArgs));
@@ -97,7 +89,7 @@ export class MI2 extends EventEmitter implements IBackend {
 				}, reject);
 			} else {
 				if (separateConsole !== undefined) {
-					linuxTerm.spawnTerminalEmulator(separateConsole).then((tty) => {
+					linuxTerm.spawnTerminalEmulator(separateConsole).then(tty => {
 						promises.push(this.sendCommand("inferior-tty-set " + tty));
 						promises.push(...autorun.map(value => { return this.sendUserInput(value); }));
 						Promise.all(promises).then(() => {
@@ -519,14 +511,25 @@ export class MI2 extends EventEmitter implements IBackend {
 	}
 
 	stop() {
-		const proc = this.process;
-		const to = setTimeout(() => {
-			process.kill(-proc.pid);
-		}, 1000);
-		this.process.on("exit", function (code) {
-			clearTimeout(to);
-		});
-		this.sendRaw("-gdb-exit");
+		if (this.isSSH) {
+			const proc = this.stream;
+			const to = setTimeout(() => {
+				proc.signal("KILL");
+			}, 1000);
+			this.stream.on("exit", function (code) {
+				clearTimeout(to);
+			});
+			this.sendRaw("-gdb-exit");
+		} else {
+			const proc = this.process;
+			const to = setTimeout(() => {
+				process.kill(-proc.pid);
+			}, 1000);
+			this.process.on("exit", function (code) {
+				clearTimeout(to);
+			});
+			this.sendRaw("-gdb-exit");
+		}
 	}
 
 	detach() {
@@ -731,34 +734,38 @@ export class MI2 extends EventEmitter implements IBackend {
 
 		const options: string[] = [];
 
-		if (thread != 0) options.push("--thread " + thread);
+		if (thread != 0)
+			options.push("--thread " + thread);
 
-		const depth: number = (await this.sendCommand(["stack-info-depth"].concat(options).join(" ")))
-			.result("depth")
-			.valueOf();
+		const depth: number = (await this.sendCommand(["stack-info-depth"].concat(options).join(" "))).result("depth").valueOf();
 		const lowFrame: number = startFrame ? startFrame : 0;
 		const highFrame: number = (maxLevels ? Math.min(depth, lowFrame + maxLevels) : depth) - 1;
 
-		if (highFrame < lowFrame) return [];
+		if (highFrame < lowFrame)
+			return [];
 
 		options.push(lowFrame.toString());
 		options.push(highFrame.toString());
 
 		const result = await this.sendCommand(["stack-list-frames"].concat(options).join(" "));
 		const stack = result.result("stack");
-		return stack.map((element) => {
+		return stack.map(element => {
 			const level = MINode.valueOf(element, "@frame.level");
 			const addr = MINode.valueOf(element, "@frame.addr");
 			const func = MINode.valueOf(element, "@frame.func");
 			const filename = MINode.valueOf(element, "@frame.file");
 			let file: string = MINode.valueOf(element, "@frame.fullname");
 			if (file) {
-				file = path.normalize(file);
+				if (this.isSSH)
+					file = path.posix.normalize(file);
+				else
+					file = path.normalize(file);
 			}
 
 			let line = 0;
 			const lnstr = MINode.valueOf(element, "@frame.line");
-			if (lnstr) line = parseInt(lnstr);
+			if (lnstr)
+				line = parseInt(lnstr);
 			const from = parseInt(MINode.valueOf(element, "@frame.from"));
 			return {
 				address: addr,
@@ -766,7 +773,7 @@ export class MI2 extends EventEmitter implements IBackend {
 				file: file,
 				function: func || from,
 				level: level,
-				line: line,
+				line: line
 			};
 		});
 	}
@@ -934,8 +941,12 @@ export class MI2 extends EventEmitter implements IBackend {
 	}
 
 	sendRaw(raw: string) {
-		if (this.printCalls) this.log("log", raw);
-		this.process.stdin.write(raw + "\n");
+		if (this.printCalls)
+			this.log("log", raw);
+		if (this.isSSH)
+			this.stream.write(raw + "\n");
+		else
+			this.process.stdin.write(raw + "\n");
 	}
 
 	sendCliCommand(command: string, threadId: number = 0, frameLevel: number = 0): Thenable<MINode> {
@@ -963,7 +974,7 @@ export class MI2 extends EventEmitter implements IBackend {
 	}
 
 	isReady(): boolean {
-		return !!this.process;
+		return this.isSSH ? this.sshReady : !!this.process;
 	}
 
 	protected quote(text: string): string {
