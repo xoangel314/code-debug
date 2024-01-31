@@ -37,6 +37,7 @@ import { Address } from "cluster";
 import { strict } from "assert";
 import { debugPort } from "process";
 import { RISCV_REG_NAMES } from "./frontend/consts";
+import {getAddrFromMINode, isKernelBreakpoint, isKernelPath} from "./utils";
 
 
 class ExtendedVariable {
@@ -79,20 +80,6 @@ class AddressSpaces {
 		this.spaces = [];
 		this.spaces.push(new AddressSpace(currentSpace, []));
 		this.currentSpaceName = currentSpace;
-	}
-	///此函数将文件目录转换为空间名，
-	///如src/bin/initproc.rs=>‘src/bin/proc.rs‘空间，src/trap/mod.rs=>‘kernel‘空间
-	///规则应交给用户决定。由于gdb断点的path只包含往上两级父目录名，
-	///比较完美的做法是，开始debug之前扫描一遍文件系统，让用户决定哪些文件属于kernel这个space。
-	///此处是一个权宜之计，对于当前版本的rCore刚好能用。
-	///注意path只要包含src/bin就会被判定为用户程序
-	public pathToSpaceName(path: string): string {
-		if (path.includes("easy-fs/src") || path.includes("user/src") || path.includes("src/bin") || path.includes("build/app")) {
-			const s = path.split("/");
-			return s[s.length - 3] + "/" + s[s.length - 2] + "/" + s[s.length - 1];
-		} else {
-			return "kernel";
-		}
 	}
 	//将当前空间的断点清除（缓存不清除）
 	public disableCurrentSpaceBreakpoints() {
@@ -207,6 +194,18 @@ class AddressSpaces {
 	}
 }
 
+enum privilegeLevel{
+	kernel,
+	user,
+	unknown,
+	hypervisor//not yet supported
+}
+
+class SteppingStatus{
+	isStepping:boolean;
+	steppingTo:privilegeLevel|null=null
+}
+
 /// Debug Adapter
 export class MI2DebugSession extends DebugSession {
 	protected variableHandles = new Handles<
@@ -234,6 +233,12 @@ export class MI2DebugSession extends DebugSession {
 	public KERNEL_IN_BREAKPOINTS_FILENAME;//those names are really confusing :(
 	public KERNEL_OUT_BREAKPOINTS_FILENAME;
 	public GO_TO_KERNEL_FILENAME;
+	public kernel_memory_ranges:string[][];
+	public user_memory_ranges:string[][];
+	public steppingStatus:SteppingStatus={isStepping:false,steppingTo:null};//是否在不停地单步
+	public currentAddr:number;
+	public privilegeLevelJustChanged:boolean=false;
+	public currentPrivilegeLevel:privilegeLevel=privilegeLevel.kernel;
 
 
 
@@ -341,6 +346,7 @@ export class MI2DebugSession extends DebugSession {
 example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done","results":[["threads",[[["id","1"],["target-id","Thread 1.1"],["details","CPU#0 [running]"],["frame",[["level","0"],["addr","0x0000000000010156"],["func","initproc::main"],["args",[]],["file","src/bin/initproc.rs"],["fullname","/home/czy/rCore-Tutorial-v3/user/src/bin/initproc.rs"],["line","13"],["arch","riscv:rv64"]]],["state","stopped"]]]],["current-thread-id","1"]]}}
 */
 	protected handleBreakpoint(info: MINode) {
+		this.updateCurrentAddrAtStop(info);
 		const event = new StoppedEvent("breakpoint", parseInt(info.record("thread-id")));
 		(event as DebugProtocol.StoppedEvent).body.allThreadsStopped =
 			info.record("stopped-threads") == "all";
@@ -348,7 +354,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		//this.sendEvent({ event: "info", body: info } as DebugProtocol.Event);
 		//TODO only for rCore currently
 		if (
-			this.addressSpaces.pathToSpaceName(info.outOfBandRecord[0].output[3][1][4][1]) === "kernel"
+			this.addr2privilege(Number(getAddrFromMINode(info)))===privilegeLevel.kernel
 		) {
 			this.addressSpaces.updateCurrentSpace("kernel");
 			this.sendEvent({ event: "inKernel" } as DebugProtocol.Event);
@@ -385,9 +391,7 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		})
 	}
 		} else {
-			const userProgramName = this.addressSpaces.pathToSpaceName(
-				info.outOfBandRecord[0].output[3][1][4][1]
-			);
+			const userProgramName = info.outOfBandRecord[0].output[3][1][4][1];
 			this.addressSpaces.updateCurrentSpace(userProgramName);
 			this.sendEvent({
 				event: "inUser",
@@ -396,8 +400,21 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 
 		}
 	}
+	/// update currentAddr, currentPrivilegeLevel, privilegeLevelJustChanged
+	public updateCurrentAddrAtStop(info:MINode) {
+		this.currentAddr = Number(getAddrFromMINode(info));
+		let newCurrentPrivilegeLevel = this.addr2privilege(this.currentAddr);
+		
+		if (newCurrentPrivilegeLevel !== this.currentPrivilegeLevel){
+			this.privilegeLevelJustChanged=true;
+		}else{
+			this.privilegeLevelJustChanged=false;
+		}
+		this.currentPrivilegeLevel = newCurrentPrivilegeLevel;
+	}
 
 	protected handleBreak(info?: MINode) {
+		this.updateCurrentAddrAtStop(info);
 		const event = new StoppedEvent("step", info ? parseInt(info.record("thread-id")) : 1);
 		(event as DebugProtocol.StoppedEvent).body.allThreadsStopped = info
 			? info.record("stopped-threads") == "all"
@@ -406,20 +423,42 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 	}
 
 	protected handlePause(info: MINode) {
+		this.updateCurrentAddrAtStop(info);
 		const event = new StoppedEvent("user request", parseInt(info.record("thread-id")));
 		(event as DebugProtocol.StoppedEvent).body.allThreadsStopped =
 			info.record("stopped-threads") == "all";
 		this.sendEvent(event);
 	}
 
+	/*example of info:
+	 {"token":23,"outOfBandRecord":
+	 [{"isStream":false,"type":"exec","asyncClass":"stopped","output":
+	 [["reason","end-stepping-range"],["frame",[["addr","0xffffffc0802cb77e"],["func","axtask::task::first_into_user"],["args",[[["name","kernel_sp"],["value","18446743801062787952"]],[["name","frame_base"],["value","18446743801062787672"]]]],["file","modules/axtask/src/task.rs"],["fullname","/home/oslab/Starry/modules/axtask/src/task.rs"],["line","746"],["arch","riscv:rv64"]]],["thread-id","1"],["stopped-threads","all"]]}]}
+	 */
 	protected stopEvent(info: MINode) {
+		this.updateCurrentAddrAtStop(info);
 		if (!this.started) this.crashed = true;
 		if (!this.quit) {
+			if(this.steppingStatus.isStepping){
+				if(this.privilegeLevelJustChanged){
+					this.stopStepping();
+				}else{
+					this.miDebugger.sendCliCommand('si');
+					return;
+				}
+			}
 			const event = new StoppedEvent("exception", parseInt(info.record("thread-id")));
 			(event as DebugProtocol.StoppedEvent).body.allThreadsStopped =
 				info.record("stopped-threads") == "all";
 			this.sendEvent(event);
 		}
+	}
+	public stopStepping() {
+		this.steppingStatus={isStepping:false,steppingTo:null};
+		this.sendEvent({
+			event: "kernelSingleSteppedToUser",
+			body: {},
+		} as DebugProtocol.Event);
 	}
 
 	protected threadCreatedEvent(info: MINode) {
@@ -524,7 +563,12 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 		}
 		this.miDebugger.clearBreakPoints(args.source.path).then(
 			() => {
-				const spaceName = this.addressSpaces.pathToSpaceName(path);
+				let spaceName = "";
+				if(isKernelPath(path)){
+					spaceName = "kernel";
+				}else{
+					spaceName = path;
+				}
 				//清空该文件的断点
 				//保存断点信息，如果这个断点不是当前空间的（比如还在内核态时就设置用户态的断点），暂时不通知GDB设置断点
 				//如果这个断点是当前地址空间，或者是内核入口断点，那么就通知GDB立即设置断点
@@ -1329,6 +1373,10 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 					// this.sendEvent({ event: "printThisInConsole", body: info  } as DebugProtocol.Event);
 				});
 				break;
+			case 'kernelSingleSteppingToUser'://this is so fucking stupid
+				this.steppingStatus={isStepping:true,steppingTo:privilegeLevel.user};
+				this.miDebugger.sendCommand('si');
+				break;
 			default:
 				return this.sendResponse(response);
 		}
@@ -1337,6 +1385,30 @@ example: {"token":43,"outOfBandRecord":[],"resultRecords":{"resultClass":"done",
 
 	public sendDebugSessionEvent(anything: any) {
 		this.sendEvent(anything);
+	}
+
+	public addr2privilege(addr64: number):privilegeLevel {
+		for(let i = 0;i<this.kernel_memory_ranges.length;i++){//[a,b) 左闭右开
+			if(Number(this.kernel_memory_ranges[i][0])<=addr64 && addr64<Number(this.kernel_memory_ranges[i][1])){
+				return privilegeLevel.kernel;
+			}
+		}
+		for(let i = 0;i<this.user_memory_ranges.length;i++){
+			if(Number(this.user_memory_ranges[i][0])<=addr64 && addr64 <Number(this.user_memory_ranges[i][1])){
+				return privilegeLevel.user;
+			}
+		}
+		return privilegeLevel.unknown;
+	}
+}
+
+
+
+function findAddr(info:MINode){
+	for(let i in info){
+		if(info[i]){
+			
+		}
 	}
 }
 

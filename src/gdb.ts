@@ -14,6 +14,7 @@ import {
 import { DebugProtocol } from "vscode-debugprotocol";
 import { MI2, escape } from "./backend/mi2/mi2";
 import { SSHArguments, ValuesFormattingMode } from "./backend/backend";
+import { isPrimitive } from "util";
 
 export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	cwd: string;
@@ -60,6 +61,8 @@ export interface AttachRequestArguments extends DebugProtocol.AttachRequestArgum
 	KERNEL_IN_BREAKPOINTS_FILENAME:string;
 	KERNEL_OUT_BREAKPOINTS_FILENAME:string;
 	GO_TO_KERNEL_FILENAME:string;
+	kernel_memory_ranges:string[][];
+	user_memory_ranges:string[][];
 }
 
 let NEXT_TERM_ID = 1;
@@ -120,6 +123,7 @@ export class GDBDebugSession extends MI2DebugSession {
 				this.sendErrorResponse(response, 103, `Failed to load MI Debugger: ${err.toString()}`);
 			});
 		}
+		this.steppingStatus={isStepping:false,steppingTo:null};
 	}
 
 	protected attachRequest(response: DebugProtocol.AttachResponse, args: AttachRequestArguments): void {
@@ -138,6 +142,8 @@ export class GDBDebugSession extends MI2DebugSession {
 		this.KERNEL_IN_BREAKPOINTS_FILENAME=args.KERNEL_IN_BREAKPOINTS_FILENAME;
 		this.KERNEL_OUT_BREAKPOINTS_FILENAME=args.KERNEL_OUT_BREAKPOINTS_FILENAME;
 		this.GO_TO_KERNEL_FILENAME=args.GO_TO_KERNEL_FILENAME;
+		this.kernel_memory_ranges=args.kernel_memory_ranges;
+		this.user_memory_ranges=args.user_memory_ranges;
 
 		this.sendEvent({ event: "userConfInfo", body:{
 			KERNEL_IN_BREAKPOINTS_LINE:args.KERNEL_IN_BREAKPOINTS_LINE, // src/trap/mod.rs中内核入口行号。可能要修改

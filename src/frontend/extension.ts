@@ -243,7 +243,7 @@ export function activate(context: vscode.ExtensionContext) {
 						//如果（因为断点等）停下
 						//更新TreeView中的信息
 						if (message.event === "stopped") {
-							vscode.debug.activeDebugSession?.customRequest("update");
+							vscode.debug.activeDebugSession?.customRequest("update");//TODO WHY USE `update`?????? update WHAT???????
 						} //处理自定义事件
 						else if (message.event === "eventTest") {
 							console.log("Extension Received eventTest");
@@ -251,7 +251,11 @@ export function activate(context: vscode.ExtensionContext) {
 						else if (message.event === "kernelToUserBorder") {
 							//到达内核态->用户态的边界
 							// removeAllCliBreakpoints();
-							vscode.window.showInformationMessage("will switched to " + userDebugFile + " breakpoints");
+							vscode.window.showInformationMessage("will keep simple stepping to user space");
+							vscode.debug.activeDebugSession?.customRequest("kernelSingleSteppingToUser", {});
+						}
+						else if (message.event === "kernelSingleSteppedToUser") {
+							vscode.window.showInformationMessage("will switched to " + userConf.userSpaceDebuggeeFolder +userDebugFile + " breakpoints");
 							vscode.debug.activeDebugSession?.customRequest("addDebugFile", {
 								debugFilepath:
 									userConf.userSpaceDebuggeeFolder +userDebugFile,
@@ -259,14 +263,14 @@ export function activate(context: vscode.ExtensionContext) {
 			
 							});
 							vscode.debug.activeDebugSession?.customRequest(
-								"updateCurrentSpace","src/bin/" + userDebugFile + ".rs"
+								"updateCurrentSpace",userDebugFile
 								//tag:oscomp2023 original:"src/bin/" + userDebugFile + ".rs"
 							);
 							// TODO@werifu: show User space
 							//vscode.debug.activeDebugSession?.customRequest("disableCurrentSpaceBreakpoints");
 							vscode.window.showInformationMessage(
 								"All breakpoints in current space removed. Symbol file " +
-									userDebugFile +
+								userConf.userSpaceDebuggeeFolder+userDebugFile +
 									" added. Now you can set user program breakpoints.  line 11 `fn main() -> i32 {` or line 13 println!(\"aaaaa... recommemded if it's initproc.rs"
 							);
 							console.log("/////////////////////////kernelToUserBorder///////////////////");

@@ -7,6 +7,7 @@ import * as net from "net";
 import * as fs from "fs";
 import * as path from "path";
 import { Client } from "ssh2";
+import {prettyPrintJSON} from "../../utils";
 
 export function escape(str: string) {
 	return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -390,7 +391,7 @@ export class MI2 extends EventEmitter implements IBackend {
 				}				
 				if (this.debugOutput)
 				{
-					this.log("log", "GDB -> App: " + JSON.stringify(parsed));
+					this.log("stdout", "GDB -> App: "+prettyPrintJSON(parsed));
 					console.log("onoutput:"+JSON.stringify(parsed));
 				}
 				// if (parsed.token !== undefined) {
@@ -737,6 +738,7 @@ export class MI2 extends EventEmitter implements IBackend {
 		if (thread != 0)
 			options.push("--thread " + thread);
 
+		//options.push("max_depth=1");
 		const depth: number = (await this.sendCommand(["stack-info-depth"].concat(options).join(" "))).result("depth").valueOf();
 		const lowFrame: number = startFrame ? startFrame : 0;
 		const highFrame: number = (maxLevels ? Math.min(depth, lowFrame + maxLevels) : depth) - 1;

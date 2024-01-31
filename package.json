@@ -1022,7 +1022,9 @@
 		"nyc": "^15.1.0",
 		"prettier": "^2.6.2",
 		"ts-node": "^10.8.0",
-		"typescript": "^3.9.3"
+		"typescript": "^3.9.3",
+		"xstate":"^5.5.2",
+		"pretty-format":"^29.7.0"
 	},
 	"__metadata": {
 		"id": "2fd22b8e-b3b8-4e7f-9a28-a5e2d1bdd0d4",
