@@ -681,7 +681,7 @@ export PATH=$PATH:/home/path/to/riscv64-linux-musl-cross/bin
        "configurations": [
            {
                "type": "gdb",
-               "request": "launch",
+               "request": "attach",
                "name": "Attach to Qemu",
                "executable": "${userHome}/rCore-Tutorial-v3/os/target/riscv64gc-unknown-none-elf/release/os",
                "target": ":1234",//不能和Qemu开放的tcp端口重叠
@@ -722,13 +722,15 @@ export PATH=$PATH:/home/path/to/riscv64-linux-musl-cross/bin
                    "-s",
                    "-S"
                ],
-            "userSpaceDebuggeeFolder":"${userHome}/rCore-Tutorial-v3/user/target/riscv64gc-unknown-none-elf/release/",
-            "KERNEL_IN_BREAKPOINTS_LINE":65, // src/trap/mod.rs中内核入口行号。可能要修改
-            "KERNEL_OUT_BREAKPOINTS_LINE":124, // src/trap/mod.rs中内核出口行号。可能要修改
+            "userSpaceDebuggeeFolder": "${userHome}/rCore-Tutorial-v3/user/target/riscv64gc-unknown-none-elf/release",
+            "KERNEL_IN_BREAKPOINTS_LINE":39, // src/trap/mod.rs中内核入口行号。可能要修改
+            "KERNEL_OUT_BREAKPOINTS_LINE":745, // src/trap/mod.rs中内核出口行号。可能要修改
             "GO_TO_KERNEL_LINE":30, // src/trap/mod.rs中，用于从用户态返回内核的断点行号。在rCore-Tutorial-v3中，这是set_user_trap_entry函数中的stvec::write(TRAMPOLINE as usize, TrapMode::Direct);语句。
-            "KERNEL_IN_BREAKPOINTS_FILENAME":"src/trap/mod.rs",
-            "KERNEL_OUT_BREAKPOINTS_FILENAME":"src/trap/mod.rs",
-            "GO_TO_KERNEL_FILENAME":"src/trap/mod.rs"
+            "KERNEL_IN_BREAKPOINTS_FILENAME":"${userHome}/rCore-Tutorial-v3/os/src/trap/mod.rs",
+            "KERNEL_OUT_BREAKPOINTS_FILENAME":"${userHome}/rCore-Tutorial-v3/os/src/trap/mod.rs",
+            "GO_TO_KERNEL_FILENAME":"",
+            "kernel_memory_ranges":[["0xefffffffffffffff","0xffffffffffffffff"]],
+            "user_memory_ranges":[["0x0000000000000000","0xe000000000000000"]]
            },
        ]
    }
