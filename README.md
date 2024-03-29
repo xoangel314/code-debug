@@ -448,7 +448,7 @@ else if (message.event === "kernelToUserBorder") {
 rCore-Tutorial为了提升性能，在用户程序链接脚本`linker.ld`里面discard了`.debug_info`等段，修改链接脚本可以让链接器不忽略这些调试信息段。但这导致easy-fs的崩溃和栈溢出，故还需将easy-fs-fuse打包程序的磁盘大小，和栈空间改大。此外，user/目录要先 make clean 再编译，修改过的linkerscript才会生效。
 
 ### 界面美化
-![coredebugger-screenshot-bootstrap-mid](./docs/imgs/code-debug UI.png)
+![coredebugger-screenshot-bootstrap-mid](./docs/imgs/code-debugUI.png)
 
 ## 总结与展望
 
